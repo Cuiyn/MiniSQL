@@ -33,3 +33,6 @@
 
 # Others
 *.txt
+minisql
+lex.yy.c
+y.tab.*
