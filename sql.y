@@ -20,10 +20,35 @@ struct Createstruct{
     char *table;
     struct Createfieldsdef *fdef;
 };
+
 struct insertValue {
     char *value;
     struct insertValue *nextValue;
 };
+
+struct Conditions{/*条件*/
+    struct  Conditions *left; //左部条件
+    struct  Conditions *right; //右部条件
+    char comp_op; /* 'a'是and, 'o'是or, '<' , '>' , '=', ‘!='  */
+    int type; /* 0是字段，1是字符串，2是整数 */
+    char *value;/* 根据type存放字段名、字符串或整数 */
+    char *table;/* NULL或表名 */
+};
+struct Selectedfields{/*select语句中选中的字段*/
+    char *table; //字段所属表
+    char *field; //字段名称
+    struct Selectedfields *next_sf;//下一个字段
+};
+struct Selectedtables{ /*select语句中选中的表*/
+    char *table; //基本表名称
+    struct  Selectedtables  *next_st; //下一个表
+};
+struct Selectstruct{ /*select语法树的根节点*/
+    struct Selectedfields *sf; //所选字段
+    struct Selectedtables *st; //所选基本表
+    struct Conditions *cons; //条件
+};
+
 
 void getDB()
 {
@@ -432,6 +457,107 @@ void deleteAll(char * tableName)
     chdir(rootDir);
 }
 
+void selectNoWhere(struct Selectedfields *fieldRoot, struct Selectedtables *tableRoot)
+{
+    int totTable = 0, totField = 0, i = 0;
+    char tableName[64][64] = {0}, fieldName[64][64] = {0};
+    struct Selectedfields *fieldTmp = fieldRoot;
+    struct Selectedtables *tableTmp = tableRoot;
+
+    chdir(rootDir);
+
+    if(strlen(database) == 0)
+        printf("\nNo database, error!\n");
+    else if(chdir(database) == -1)
+        printf("\nError!\n");
+    else
+    {
+        while(tableTmp != NULL)
+        {
+            strcpy(tableName[totTable], tableTmp->table);
+            tableTmp = tableTmp->next_st;
+            totTable ++;
+        }
+        if (fieldRoot == NULL)
+        {
+            int flag = 1;
+            for (i = totTable-1; i >= 0; --i)
+            {
+                if(access(tableName[i], F_OK) == -1)
+                {
+                    printf("Table %s doesn't exist!\n", tableName[i]);
+                    flag = 0;
+                    break;
+                }
+            }
+            if (flag && totTable == 1)
+            {
+                FILE* filein;
+                int tot = 0, i = 0;
+                char value[64];
+
+                filein = fopen(tableName[0], "r");
+                fscanf(filein, "%d", &tot);
+                i = tot;
+                while(fscanf(filein, "%s", value) != EOF)
+                {
+                    printf("%*s", 20, value);
+                    i--;
+                    if (i == 0)
+                    {
+                        i = tot;
+                        printf("\n");
+                    }
+                }
+                printf("Select succeed.\n");
+            }
+            else if (flag && totTable != 1)
+            {
+                /*
+                int tot = 0;
+                char rows[128][64] = {0};
+                for (i = totTable-1; i >= 0; --i)
+                {
+                    FILE* filein;
+                    int tott = 0, i = 0;
+
+                    filein = fopen(tableName[i], "r");
+                    fscanf(filein, "%d", &tott);
+                    for (i = tot; i < tott+tot; ++i)
+                    {
+                        fscanf(filein, "%s", rows[i]);
+                        printf("%*s", 20, rows[i]);
+                    }
+                    tot += tott;
+                    fclose(filein);
+                }
+                */
+            }
+        }
+        else
+        {
+            //TODO
+        }
+    }
+
+    fieldTmp = fieldRoot;
+    tableTmp = tableRoot;
+    while(fieldRoot != NULL)
+    {
+        fieldTmp = fieldRoot;
+        fieldRoot = fieldRoot->next_sf;
+        free(fieldTmp);
+    }
+    while(tableRoot != NULL)
+    {
+        tableTmp = tableRoot;
+        tableRoot = tableRoot->next_st;
+        free(tableTmp);
+    }
+    chdir(rootDir);
+    printf("MiniSQL>");
+}
+
 
 void yyerror(const char *str){
     fprintf(stderr,"error:%s\n",str);
@@ -458,13 +584,24 @@ main()
     char * yych;
     struct Createfieldsdef *cfdef_var; //字段定义
     struct Createstruct *cs_var; //整个create语句
-    struct insertValue *is_val //Insert Value
+
+    struct insertValue *is_val; //Insert Value
+
+    struct Selectedfields *sf_var; //所选字段
+    struct Selectedtables *st_var; //所选表格
+    struct Conditions *cons_var; //条件语句
+    struct Selectstruct *ss_var; //整个select语句
 }
+
 %token CREATE SHOW DATABASE DATABASES TABLE TABLES INSERT SELECT UPDATE DELETE DROP EXIT NUMBER CHAR INT ID AND OR FROM WHERE VALUES INTO SET QUOTE USE
 %type <yych> table field type ID NUMBER CHAR INT
 %type <cfdef_var> fieldsdefinition field_type
 %type <cs_var> createsql
 %type <is_val> values value
+%type <sf_var>  fields_star table_fields table_field
+%type <st_var>  tables
+%type <cons_var>  condition  conditions
+%type <ss_var>  selectsql
 %left OR
 %left AND
 
@@ -529,20 +666,59 @@ showsql: SHOW DATABASES ';'
 
 selectsql:  SELECT fields_star FROM tables ';'
             {
-            //TODO
-                printf("Select succeed.\n");
+                selectNoWhere($2, $4);
             }
             | SELECT fields_star FROM tables WHERE conditions ';'
             {
             //TODO
+                //selectWhere();
                 printf("Select succeed.\n");
             }
-            fields_star: table_fields | '*'
-            table_fields: table_field | table_fields ',' table_field
-            table_field: field | table '.' field
-            tables: tables ',' table | table
+            fields_star: table_fields
+                         {
+                             $$ = $1;
+                         }
+                         | '*'
+                         {
+                             $$ = NULL;
+                         }
+            table_fields: table_field
+                          {
+                               $$ = $1;
+                          }
+                          |
+                          table_fields ',' table_field
+                          {
+                               $$ = (struct Selectedfields *)malloc(sizeof(struct Selectedfields));
+                               $$->next_sf = $3;
+                          }
+            table_field: field
+                         {
+                             $$ = (struct Selectedfields *)malloc(sizeof(struct Selectedfields));
+                             $$->field = $1;
+                             $$->next_sf = NULL;
+                         }
+                         | table '.' field
+                         {
+                             $$ = (struct Selectedfields *)malloc(sizeof(struct Selectedfields));
+                             $$->field = $3;
+                             $$->table = $1;
+                             $$->next_sf = NULL;
+                         }
+            tables: tables ',' table
+                    {
+                        $$ = (struct Selectedtables *)malloc(sizeof(struct Selectedtables));
+                        $$->table = $3;
+                        $$->next_st = $1;
+                    }
+                    | table
+                    {
+                        $$ = (struct Selectedtables *)malloc(sizeof(struct Selectedtables));
+                        $$->table = $1;
+                        $$->next_st = NULL;
+                    }
             conditions: condition | '(' conditions ')'
-                       | conditions  AND conditions | conditions OR conditions
+                       | conditions AND conditions | conditions OR conditions
             condition: comp_left comp_op comp_right
             comp_left: table_field
             comp_right: table_field | NUMBER
