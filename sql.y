@@ -501,7 +501,7 @@ void selectNoWhere(struct Selectedfields *fieldRoot, struct Selectedtables *tabl
                 i = tot;
                 while(fscanf(filein, "%s", value) != EOF)
                 {
-                    printf("%*s", 20, value);
+                    printf("%*s", 16, value);
                     i--;
                     if (i == 0)
                     {
@@ -513,6 +513,7 @@ void selectNoWhere(struct Selectedfields *fieldRoot, struct Selectedtables *tabl
             }
             else if (flag && totTable != 1)
             {
+                //Multi tables
                 /*
                 int tot = 0;
                 char rows[128][64] = {0};
@@ -536,7 +537,72 @@ void selectNoWhere(struct Selectedfields *fieldRoot, struct Selectedtables *tabl
         }
         else
         {
-            //TODO
+            int flag = 1;
+            char allField[64][64] = {0};
+            for (i = totTable-1; i >= 0; --i)
+            {
+                if(access(tableName[i], F_OK) == -1)
+                {
+                    printf("Table %s doesn't exist!\n", tableName[i]);
+                    flag = 0;
+                    break;
+                }
+            }
+            if (flag && totTable == 1)
+            {
+                FILE* filein;
+                int tot = 0, i = 0, j = 0;
+                char value[64];
+                int isField[64] = {0};
+
+                while(fieldTmp != NULL)
+                {
+                    strcpy(fieldName[totField], fieldTmp->field);
+                    fieldTmp = fieldTmp->next_sf;
+                    totField ++;
+                }
+
+                filein = fopen(tableName[0], "r");
+                fscanf(filein, "%d", &tot);
+                for (i = 0; i < tot; ++i)
+                {
+                    fscanf(filein, "%s", allField[i]);
+                    for (j = 0; j < totField; ++j)
+                    {
+                        if (strcmp(allField[i], fieldName[j]) == 0)
+                        {
+                            isField[i] = 1;
+                            break;
+                        }
+                    }
+                }
+                for (i = 0; i < tot; ++i)
+                {
+                    if (isField[i])
+                        printf("%*s", 16, allField[i]);
+                }
+                printf("\n");
+
+                i = tot;
+                while(fscanf(filein, "%s", value) != EOF)
+                {
+                    if (isField[tot - i])
+                    {
+                        printf("%*s", 16, value);
+                    }
+                    i--;
+                    if (i == 0)
+                    {
+                        i = tot;
+                        printf("\n");
+                    }
+                }
+                printf("Select succeed.\n");
+            }
+            else if (flag && totTable != 1)
+            {
+                //Multi tables
+            }
         }
     }
 
@@ -690,12 +756,15 @@ selectsql:  SELECT fields_star FROM tables ';'
                           table_fields ',' table_field
                           {
                                $$ = (struct Selectedfields *)malloc(sizeof(struct Selectedfields));
-                               $$->next_sf = $3;
+                               $$->field = $3->field;
+                               $$->table = $3->table;
+                               $$->next_sf = $1;
                           }
             table_field: field
                          {
                              $$ = (struct Selectedfields *)malloc(sizeof(struct Selectedfields));
                              $$->field = $1;
+                             $$->table = NULL;
                              $$->next_sf = NULL;
                          }
                          | table '.' field
