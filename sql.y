@@ -29,7 +29,7 @@ struct insertValue {
 struct Conditions{/*条件*/
     struct  Conditions *left; //左部条件
     struct  Conditions *right; //右部条件
-    char comp_op; /* 'a'是and, 'o'是or, '<' , '>' , '=', ‘!='  */
+    char *comp_op; /* 'a'是and, 'o'是or, '<' , '>' , '=', ‘!='  */
     int type; /* 0是字段，1是字符串，2是整数 */
     char *value;/* 根据type存放字段名、字符串或整数 */
     char *table;/* NULL或表名 */
@@ -509,6 +509,7 @@ void selectNoWhere(struct Selectedfields *fieldRoot, struct Selectedtables *tabl
                         printf("\n");
                     }
                 }
+                fclose(filein);
                 printf("Select succeed.\n");
             }
             else if (flag && totTable != 1)
@@ -597,6 +598,7 @@ void selectNoWhere(struct Selectedfields *fieldRoot, struct Selectedtables *tabl
                         printf("\n");
                     }
                 }
+                fclose(filein);
                 printf("Select succeed.\n");
             }
             else if (flag && totTable != 1)
@@ -620,6 +622,169 @@ void selectNoWhere(struct Selectedfields *fieldRoot, struct Selectedtables *tabl
         tableRoot = tableRoot->next_st;
         free(tableTmp);
     }
+    chdir(rootDir);
+    printf("MiniSQL>");
+}
+
+void selectWhere(struct Selectedfields *fieldRoot, struct Selectedtables *tableRoot, struct Conditions *conditionRoot)
+{
+    int totTable = 0, totField = 0, i = 0;
+    int flag = 1;
+    char allField[64][64] = {0};
+    char tableName[64][64] = {0}, fieldName[64][64] = {0};
+    struct Selectedfields *fieldTmp = fieldRoot;
+    struct Selectedtables *tableTmp = tableRoot;
+    struct Conditions *conditionTmp = conditionRoot;
+
+    chdir(rootDir);
+
+    if(strlen(database) == 0)
+        printf("\nNo database, error!\n");
+    else if(chdir(database) == -1)
+        printf("\nError!\n");
+    else
+    {
+        while(tableTmp != NULL)
+        {
+            strcpy(tableName[totTable], tableTmp->table);
+            tableTmp = tableTmp->next_st;
+            totTable ++;
+        }
+
+        for (i = totTable-1; i >= 0; --i)
+        {
+            if(access(tableName[i], F_OK) == -1)
+            {
+                printf("Table %s doesn't exist!\n", tableName[i]);
+                flag = 0;
+                break;
+            }
+        }
+        if (flag && totTable == 1)
+        {
+            FILE* filein;
+            int tot = 0, i = 0, j = 0, totValue = 0;
+            char value[64];
+            char values[64][64][64];
+            int isField[64] = {0};
+
+            while(fieldTmp != NULL)
+            {
+                strcpy(fieldName[totField], fieldTmp->field);
+                fieldTmp = fieldTmp->next_sf;
+                totField ++;
+            }
+
+            filein = fopen(tableName[0], "r");
+            fscanf(filein, "%d", &tot);
+
+            if (fieldRoot != NULL)
+            {
+                for (i = 0; i < tot; ++i)
+                {
+                    fscanf(filein, "%s", allField[i]);
+                    for (j = 0; j < totField; ++j)
+                    {
+                        if (strcmp(allField[i], fieldName[j]) == 0)
+                        {
+                            isField[i] = 1;
+                            break;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                for (i = 0; i < tot; ++i)
+                {
+                    fscanf(filein, "%s", allField[i]);
+                    isField[i] = 1;
+                }
+            }
+            for (i = 0; i < tot; ++i)
+            {
+                if (isField[i])
+                    printf("%*s", 16, allField[i]);
+            }
+            printf("\n");
+
+            i = 0;
+            j = 0;
+            while(fscanf(filein, "%s", value) != EOF)
+            {
+                strcpy(values[i][j], value);
+                j++;
+                if (j == tot-1)
+                {
+                    j = 0;
+                    i++;
+                }
+            }
+            totValue = i;
+            for (i = 0; i < totValue; ++i)
+            {
+                int conditionFlag = 0;
+                while(conditionTmp->left != NULL)
+                {
+
+                }
+                conditionTmp = conditionRoot;
+                if (conditionFlag)
+                {
+                    for (j = 0; j < count; ++j)
+                    {
+                        printf("%*s", 16, values[i][j]);
+                    }
+                    printf("\n");
+                }
+            }
+
+            /*
+            i = tot;
+            while(fscanf(filein, "%s", value) != EOF)
+            {
+                if (isField[tot - i])
+                {
+                    printf("%*s", 16, value);
+                }
+                i--;
+                if (i == 0)
+                {
+                    i = tot;
+                    printf("\n");
+                }
+            }
+            */
+            fclose(filein);
+            printf("Select succeed.\n");
+        }
+        else if (flag && totTable != 1)
+        {
+            //TODO: Multi tables
+        }
+    }
+
+    fieldTmp = fieldRoot;
+    tableTmp = tableRoot;
+    conditionTmp = conditionRoot;
+    while(fieldRoot != NULL)
+    {
+        fieldTmp = fieldRoot;
+        fieldRoot = fieldRoot->next_sf;
+        free(fieldTmp);
+    }
+    while(tableRoot != NULL)
+    {
+        tableTmp = tableRoot;
+        tableRoot = tableRoot->next_st;
+        free(tableTmp);
+    }
+    /*
+    while(conditionRoot != NULL)
+    {
+        //TODO: Memory leak
+    }
+    */
     chdir(rootDir);
     printf("MiniSQL>");
 }
@@ -660,13 +825,13 @@ main()
 }
 
 %token CREATE SHOW DATABASE DATABASES TABLE TABLES INSERT SELECT UPDATE DELETE DROP EXIT NUMBER CHAR INT ID AND OR FROM WHERE VALUES INTO SET QUOTE USE
-%type <yych> table field type ID NUMBER CHAR INT
+%type <yych> table field type ID NUMBER CHAR INT comp_op
 %type <cfdef_var> fieldsdefinition field_type
 %type <cs_var> createsql
 %type <is_val> values value
 %type <sf_var>  fields_star table_fields table_field
 %type <st_var>  tables
-%type <cons_var>  condition  conditions
+%type <cons_var>  condition  conditions comp_left comp_right
 %type <ss_var>  selectsql
 %left OR
 %left AND
@@ -736,9 +901,8 @@ selectsql:  SELECT fields_star FROM tables ';'
             }
             | SELECT fields_star FROM tables WHERE conditions ';'
             {
-            //TODO
-                //selectWhere();
-                printf("Select succeed.\n");
+
+                selectWhere($2, $4, $6);
             }
             fields_star: table_fields
                          {
@@ -786,12 +950,90 @@ selectsql:  SELECT fields_star FROM tables ';'
                         $$->table = $1;
                         $$->next_st = NULL;
                     }
-            conditions: condition | '(' conditions ')'
-                       | conditions AND conditions | conditions OR conditions
+            conditions: condition
+                        {
+                            $$ = $1;
+                        }
+                        | '(' conditions ')'
+                        {
+                            $$ = $2;
+                        }
+                        | conditions AND conditions
+                        {
+                            $$ = (struct Conditions *)malloc(sizeof(struct Conditions));
+                            $$->left = $1;
+                            $$->right = $3;
+                            char c = 'a';
+                            char *cc = &c;
+                            $$->comp_op = cc;
+                        }
+                        | conditions OR conditions
+                        {
+                            $$ = (struct Conditions *)malloc(sizeof(struct Conditions));
+                            $$->left = $1;
+                            $$->right = $3;
+                            char c = 'o';
+                            char *cc = &c;
+                            $$->comp_op = cc;
+                        }
             condition: comp_left comp_op comp_right
+                       {
+                            $$ = (struct Conditions *)malloc(sizeof(struct Conditions));
+                            $$->left = $1;
+                            $$->right = $3;
+                            $$->comp_op = $2;
+                       }
             comp_left: table_field
-            comp_right: table_field | NUMBER
-            comp_op: '<' | '>' | '=' | '!' '='
+                       {
+                            $$ = (struct Conditions *)malloc(sizeof(struct Conditions));
+                            $$->type = 0;
+                            $$->value = $1->field;
+                            $$->table = $1->table;
+                       }
+            comp_right: table_field
+                        {
+                            $$ = (struct Conditions *)malloc(sizeof(struct Conditions));
+                            $$->type = 1;
+                            $$->value = $1->field;
+                            $$->table = $1->table;
+                        }
+                        | NUMBER
+                        {
+                            $$ = (struct Conditions *)malloc(sizeof(struct Conditions));
+                            $$->type = 2;
+                            $$->value = $1;
+                            $$->table = NULL;
+                        }
+            comp_op: '<'
+                     {
+                        char c = '<';
+                        $$ = &c;
+                     }
+                     | '>'
+                     {
+                        char c = '>';
+                        $$ = &c;
+                     }
+                     | '='
+                     {
+                        char c = '=';
+                        $$ = &c;
+                     }
+                     | '!' '='
+                     {
+                        char c = '!';
+                        $$ = &c;
+                     }
+                     | AND
+                     {
+                        char c = 'a';
+                        $$ = &c;
+                     }
+                     | OR
+                     {
+                        char c = 'o';
+                        $$ = &c;
+                     }
 
 insertsql: INSERT INTO table VALUES '(' values ')' ';'
             {
@@ -843,14 +1085,14 @@ deletesql: DELETE FROM table ';'
             | DELETE FROM table WHERE conditions ';'
             {
             //TODO
-                printf("Delete succeed.\n");
+                printf("Delete todo...\n");
             }
             equal: '='
 
 updatesql: UPDATE table SET sets WHERE field equal value ';'
             {
             //TODO
-                printf("Update succeed.\n");
+                printf("Update todo...\n");
             }
             sets: set | sets ',' set
             set: field equal value
