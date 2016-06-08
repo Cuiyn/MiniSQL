@@ -785,6 +785,7 @@ void selectWhere(struct Selectedfields *fieldRoot, struct Selectedtables *tableR
             for (i = 0; ; ++i)
             {
                 int conditionFlag = 0;
+                end = 1;
 
                 for (j = 0; j < tot; ++j)
                 {
@@ -843,6 +844,91 @@ void selectWhere(struct Selectedfields *fieldRoot, struct Selectedtables *tableR
     */
     chdir(rootDir);
     printf("MiniSQL>");
+}
+
+void deleteWhere(char *tableName, struct Conditions *conditionRoot)
+{
+    int i = 0, j = 0, totField = 0;
+    char allField[64][64] = {0};
+    char field[64][64] = {0};
+    struct Conditions *conditionTmp = conditionRoot;
+
+    chdir(rootDir);
+
+    if(strlen(database) == 0)
+        printf("\nNo database, error!\n");
+    else if(chdir(database) == -1)
+        printf("\nError!\n");
+    else
+    {
+        if(access(tableName, F_OK) == -1)
+        {
+            printf("Table %s doesn't exist!\n", tableName);
+        }
+        else
+        {
+            FILE* filein;
+            FILE* fileout;
+            int end = 1;
+            char cp[64] = "cp ";
+            char rm[64] = "rm -rf ";
+            char tableTmp[64] = {0};
+            strcpy(tableTmp, tableName);
+            strcat(tableTmp, ".tmp");
+            strcat(cp, tableName);
+            strcat(cp, " ");
+            strcat(cp, tableTmp);
+            strcat(rm, tableTmp);
+
+            system(cp);
+
+            filein = fopen(tableTmp, "r");
+            fileout = fopen(tableName, "w");
+
+            fscanf(filein, "%d", &totField);
+            fprintf(fileout, "%d\n", totField);
+            for (int i = 0; i < totField; ++i)
+            {
+                fscanf(filein, "%s", allField[i]);
+                fprintf(fileout, "%s\n", allField[i]);
+            }
+
+            for (i = 0; ; ++i)
+            {
+                int conditionFlag = 0;
+                end = 1;
+
+                for (j = 0; j < totField; ++j)
+                {
+                    if(fscanf(filein, "%s", field[j]) == EOF)
+                    {
+                        end = 0;
+                        break;
+                    }
+                }
+                if (end == 0)
+                {
+                    break;
+                }
+
+                conditionFlag = whereSearch(conditionRoot, totField, allField, field);
+                if (!conditionFlag)
+                {
+                    for (j = 0; j < totField; ++j)
+                    {
+                        fprintf(fileout, "%s\n", field[j]);
+                    }
+                }
+            }
+            fclose(fileout);
+            fclose(filein);
+            system(rm);
+            printf("Delete succeed.\n");
+        }
+    }
+    free(tableName);
+    printf("MiniSQL>");
+    chdir(rootDir);
 }
 
 
@@ -1140,8 +1226,7 @@ deletesql: DELETE FROM table ';'
             }
             | DELETE FROM table WHERE conditions ';'
             {
-            //TODO
-                printf("Delete todo...\n");
+                deleteWhere($3, $5);
             }
             equal: '='
 
