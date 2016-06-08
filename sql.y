@@ -626,6 +626,80 @@ void selectNoWhere(struct Selectedfields *fieldRoot, struct Selectedtables *tabl
     printf("MiniSQL>");
 }
 
+int whereSearch(struct Conditions *conditionRoot, int totField, char allField[][64], char value[][64])
+{
+    char comp_op = *(conditionRoot->comp_op);
+
+    if (comp_op == 'a')
+    {
+        return whereSearch(conditionRoot->left, totField, allField, value) && whereSearch(conditionRoot->right, totField, allField, value);
+    }
+    else if (comp_op == 'o')
+    {
+        return whereSearch(conditionRoot->left, totField, allField, value) || whereSearch(conditionRoot->right, totField, allField, value);
+    }
+    else
+    {
+        int field = 0;
+        for (int i = 0; i < totField; ++i)
+        {
+            if (strcmp(allField[i], conditionRoot->left->value) == 0)
+            {
+                field = i;
+                break;
+            }
+        }
+        if (comp_op == '=')
+        {
+            if (strcmp(value[field], conditionRoot->right->value) == 0)
+            {
+                return 1;
+            }
+            else
+                return 0;
+        }
+        else if (comp_op == '>')
+        {
+            if (conditionRoot->right->type == 0)
+            {
+                return 0;
+            }
+            else if (atoi(value[field]) > atoi(conditionRoot->right->value))
+            {
+                return 1;
+            }
+            else
+                return 0;
+        }
+        else if (comp_op == '<')
+        {
+            if (conditionRoot->right->type == 0)
+            {
+                return 0;
+            }
+            else if (atoi(value[field]) < atoi(conditionRoot->right->value))
+            {
+                return 1;
+            }
+            else
+                return 0;
+        }
+        else if (comp_op == '!')
+        {
+            if (conditionRoot->right->type == 0)
+            {
+                return 0;
+            }
+            else if (atoi(value[field]) != atoi(conditionRoot->right->value))
+            {
+                return 1;
+            }
+            else
+                return 0;
+        }
+    }
+}
+
 void selectWhere(struct Selectedfields *fieldRoot, struct Selectedtables *tableRoot, struct Conditions *conditionRoot)
 {
     int totTable = 0, totField = 0, i = 0;
@@ -663,9 +737,8 @@ void selectWhere(struct Selectedfields *fieldRoot, struct Selectedtables *tableR
         if (flag && totTable == 1)
         {
             FILE* filein;
-            int tot = 0, i = 0, j = 0, totValue = 0;
-            char value[64];
-            char values[64][64][64];
+            int tot = 0, i = 0, j = 0;
+            char values[64][64] = {0};
             int isField[64] = {0};
 
             while(fieldTmp != NULL)
@@ -708,53 +781,36 @@ void selectWhere(struct Selectedfields *fieldRoot, struct Selectedtables *tableR
             }
             printf("\n");
 
-            i = 0;
-            j = 0;
-            while(fscanf(filein, "%s", value) != EOF)
-            {
-                strcpy(values[i][j], value);
-                j++;
-                if (j == tot-1)
-                {
-                    j = 0;
-                    i++;
-                }
-            }
-            totValue = i;
-            for (i = 0; i < totValue; ++i)
+            int end = 1;
+            for (i = 0; ; ++i)
             {
                 int conditionFlag = 0;
-                while(conditionTmp->left != NULL)
-                {
 
+                for (j = 0; j < tot; ++j)
+                {
+                    if(fscanf(filein, "%s", values[j]) == EOF)
+                    {
+                        end = 0;
+                        break;
+                    }
                 }
-                conditionTmp = conditionRoot;
+                if (end == 0)
+                {
+                    break;
+                }
+
+                conditionFlag = whereSearch(conditionRoot, tot, allField, values);
                 if (conditionFlag)
                 {
-                    for (j = 0; j < count; ++j)
+                    for (j = 0; j < tot; ++j)
                     {
-                        printf("%*s", 16, values[i][j]);
+                        if (isField[j])
+                            printf("%*s", 16, values[j]);
                     }
                     printf("\n");
                 }
             }
 
-            /*
-            i = tot;
-            while(fscanf(filein, "%s", value) != EOF)
-            {
-                if (isField[tot - i])
-                {
-                    printf("%*s", 16, value);
-                }
-                i--;
-                if (i == 0)
-                {
-                    i = tot;
-                    printf("\n");
-                }
-            }
-            */
             fclose(filein);
             printf("Select succeed.\n");
         }
@@ -990,12 +1046,12 @@ selectsql:  SELECT fields_star FROM tables ';'
                             $$->value = $1->field;
                             $$->table = $1->table;
                        }
-            comp_right: table_field
+            comp_right: QUOTE table_field QUOTE
                         {
                             $$ = (struct Conditions *)malloc(sizeof(struct Conditions));
                             $$->type = 1;
-                            $$->value = $1->field;
-                            $$->table = $1->table;
+                            $$->value = $2->field;
+                            $$->table = $2->table;
                         }
                         | NUMBER
                         {

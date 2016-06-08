@@ -40,6 +40,9 @@ INTO           return INTO;
 ";"     |
 "("     |
 ")"     |
+"<"     |
+">"     |
+"!"     |
 ","     {return yytext[0]; }
 
 \'      return QUOTE;
