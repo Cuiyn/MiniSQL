@@ -465,7 +465,7 @@ void deleteAll(char * tableName)
 
 void selectNoWhere(struct Selectedfields *fieldRoot, struct Selectedtables *tableRoot)
 {
-    int totTable = 0, totField = 0, i = 0;
+    int totTable = 0, totField = 0, i = 0, j = 0, k = 0;
     char tableName[64][64] = {0}, fieldName[64][64] = {0};
     struct Selectedfields *fieldTmp = fieldRoot;
     struct Selectedtables *tableTmp = tableRoot;
@@ -518,28 +518,84 @@ void selectNoWhere(struct Selectedfields *fieldRoot, struct Selectedtables *tabl
                 fclose(filein);
                 printf("Select succeed.\n");
             }
-            else if (flag && totTable != 1)
+            else if (flag && totTable == 2)
             {
-                //Multi tables
-                /*
-                int tot = 0;
-                char rows[128][64] = {0};
-                for (i = totTable-1; i >= 0; --i)
+                FILE * fileTable[64];
+                FILE * fileTmp;
+                int fieldCount[2] = {0}, valueCount[2] = {0};
+                char values1[64][64] = {0}, values2[64][64] = {0};
+                char tmp[64];
+                strcpy(tmp, tableName[0]);
+                strcpy(tableName[0], tableName[1]);
+                strcpy(tableName[1], tmp);
+                fileTmp = fopen(".tmp", "w");
+                for (i = 0; i < totTable; ++i)
                 {
-                    FILE* filein;
-                    int tott = 0, i = 0;
-
-                    filein = fopen(tableName[i], "r");
-                    fscanf(filein, "%d", &tott);
-                    for (i = tot; i < tott+tot; ++i)
-                    {
-                        fscanf(filein, "%s", rows[i]);
-                        printf("%*s", 20, rows[i]);
-                    }
-                    tot += tott;
-                    fclose(filein);
+                    fileTable[i] = fopen(tableName[i], "r");
                 }
-                */
+                totField = 0;
+                for (i = 0; i < totTable; ++i)
+                {
+                    fscanf(fileTable[i], "%d", &fieldCount[i]);
+                    totField += fieldCount[i];
+                }
+
+                fprintf(fileTmp, "%d\n", totField);
+                for (i = 0; i < fieldCount[0]; ++i)
+                {
+                    fscanf(fileTable[0], "%s", tmp);
+                    fprintf(fileTmp, "%s\n", tmp);
+                }
+                for (i = 0; i < fieldCount[1]; ++i)
+                {
+                    fscanf(fileTable[1], "%s", tmp);
+                    fprintf(fileTmp, "%s\n", tmp);
+                }
+
+                while(fscanf(fileTable[0], "%s", tmp) != EOF)
+                {
+                    strcpy(values1[valueCount[0]], tmp);
+                    valueCount[0]++;
+                }
+                while(fscanf(fileTable[1], "%s", tmp) != EOF)
+                {
+                    strcpy(values2[valueCount[1]], tmp);
+                    valueCount[1]++;
+                }
+
+                for (i = 0; i < valueCount[0]/fieldCount[0]; ++i)
+                {
+                    for (k = 0; k < valueCount[1]/fieldCount[1]; ++k)
+                    {
+                        for (j = 0; j < fieldCount[0]; ++j)
+                        {
+                            fprintf(fileTmp, "%s\n", values1[i*fieldCount[0]+j]);
+                        }
+                        for (j = 0; j < fieldCount[1]; ++j)
+                        {
+                            fprintf(fileTmp, "%s\n", values2[k*fieldCount[1]+j]);
+                        }
+                    }
+                }
+                fclose(fileTmp);
+                fclose(fileTable[0]);
+                fclose(fileTable[1]);
+                fileTmp = fopen(".tmp", "r");
+                i = totField;
+                fscanf(fileTmp, "%d", &totField);
+                while(fscanf(fileTmp, "%s", tmp) != EOF)
+                {
+                    printf("%*s", 16, tmp);
+                    i--;
+                    if (i == 0)
+                    {
+                        i = totField;
+                        printf("\n");
+                    }
+                }
+                fclose(fileTmp);
+                system("rm -rf .tmp");
+                printf("Select succeed.\n");
             }
         }
         else
@@ -607,9 +663,115 @@ void selectNoWhere(struct Selectedfields *fieldRoot, struct Selectedtables *tabl
                 fclose(filein);
                 printf("Select succeed.\n");
             }
-            else if (flag && totTable != 1)
+            else if (flag && totTable == 2)
             {
-                //Multi tables
+                FILE * fileTable[64];
+                FILE * fileTmp;
+                int fieldCount[2] = {0}, valueCount[2] = {0}, isField[64] = {0};
+                char values1[64][64] = {0}, values2[64][64] = {0};
+                char tmp[64];
+                int tot = 0;
+                strcpy(tmp, tableName[0]);
+                strcpy(tableName[0], tableName[1]);
+                strcpy(tableName[1], tmp);
+                fileTmp = fopen(".tmp", "w");
+                for (i = 0; i < totTable; ++i)
+                {
+                    fileTable[i] = fopen(tableName[i], "r");
+                }
+                totField = 0;
+                for (i = 0; i < totTable; ++i)
+                {
+                    fscanf(fileTable[i], "%d", &fieldCount[i]);
+                    totField += fieldCount[i];
+                }
+
+                fprintf(fileTmp, "%d\n", totField);
+                for (i = 0; i < fieldCount[0]; ++i)
+                {
+                    fscanf(fileTable[0], "%s", tmp);
+                    fprintf(fileTmp, "%s\n", tmp);
+                }
+                for (i = 0; i < fieldCount[1]; ++i)
+                {
+                    fscanf(fileTable[1], "%s", tmp);
+                    fprintf(fileTmp, "%s\n", tmp);
+                }
+
+                while(fscanf(fileTable[0], "%s", tmp) != EOF)
+                {
+                    strcpy(values1[valueCount[0]], tmp);
+                    valueCount[0]++;
+                }
+                while(fscanf(fileTable[1], "%s", tmp) != EOF)
+                {
+                    strcpy(values2[valueCount[1]], tmp);
+                    valueCount[1]++;
+                }
+
+                for (i = 0; i < valueCount[0]/fieldCount[0]; ++i)
+                {
+                    for (k = 0; k < valueCount[1]/fieldCount[1]; ++k)
+                    {
+                        for (j = 0; j < fieldCount[0]; ++j)
+                        {
+                            fprintf(fileTmp, "%s\n", values1[i*fieldCount[0]+j]);
+                        }
+                        for (j = 0; j < fieldCount[1]; ++j)
+                        {
+                            fprintf(fileTmp, "%s\n", values2[k*fieldCount[1]+j]);
+                        }
+                    }
+                }
+                fclose(fileTmp);
+                fclose(fileTable[0]);
+                fclose(fileTable[1]);
+                fileTmp = fopen(".tmp", "r");
+
+                while(fieldTmp != NULL)
+                {
+                    strcpy(fieldName[totField], fieldTmp->field);
+                    fieldTmp = fieldTmp->next_sf;
+                    totField ++;
+                }
+
+                fscanf(fileTmp, "%d", &tot);
+                for (i = 0; i < tot; ++i)
+                {
+                    fscanf(fileTmp, "%s", allField[i]);
+                    for (j = 0; j < totField; ++j)
+                    {
+                        if (strcmp(allField[i], fieldName[j]) == 0)
+                        {
+                            isField[i] = 1;
+                            break;
+                        }
+                    }
+                }
+                for (i = 0; i < tot; ++i)
+                {
+                    if (isField[i])
+                        printf("%*s", 16, allField[i]);
+                }
+                printf("\n");
+
+                i = tot;
+                while(fscanf(fileTmp, "%s", tmp) != EOF)
+                {
+                    if (isField[tot - i])
+                    {
+                        printf("%*s", 16, tmp);
+                    }
+                    i--;
+                    if (i == 0)
+                    {
+                        i = tot;
+                        printf("\n");
+                    }
+                }
+                fclose(fileTmp);
+                system("rm -rf .tmp");
+                printf("Select succeed.\n");
             }
         }
     }
@@ -831,9 +993,145 @@ void selectWhere(struct Selectedfields *fieldRoot, struct Selectedtables *tableR
             fclose(filein);
             printf("Select succeed.\n");
         }
-        else if (flag && totTable != 1)
+        else if (flag && totTable == 2)
         {
-            //TODO: Multi tables
+            FILE * fileTable[64];
+            FILE * fileTmp;
+            int fieldCount[2] = {0}, valueCount[2] = {0};
+            char values1[64][64] = {0}, values2[64][64] = {0};
+            char tmp[64];
+            int tot = 0, i = 0, j = 0, k = 0;
+            char values[64][64] = {0};
+            int isField[64] = {0};
+
+            strcpy(tmp, tableName[0]);
+            strcpy(tableName[0], tableName[1]);
+            strcpy(tableName[1], tmp);
+            fileTmp = fopen(".tmp", "w");
+            for (i = 0; i < totTable; ++i)
+                fileTable[i] = fopen(tableName[i], "r");
+
+            totField = 0;
+            for (i = 0; i < totTable; ++i)
+            {
+                fscanf(fileTable[i], "%d", &fieldCount[i]);
+                totField += fieldCount[i];
+            }
+
+            fprintf(fileTmp, "%d\n", totField);
+            for (i = 0; i < fieldCount[0]; ++i)
+            {
+                fscanf(fileTable[0], "%s", tmp);
+                fprintf(fileTmp, "%s\n", tmp);
+            }
+            for (i = 0; i < fieldCount[1]; ++i)
+            {
+                fscanf(fileTable[1], "%s", tmp);
+                fprintf(fileTmp, "%s\n", tmp);
+            }
+
+            while(fscanf(fileTable[0], "%s", tmp) != EOF)
+            {
+                strcpy(values1[valueCount[0]], tmp);
+                valueCount[0]++;
+            }
+            while(fscanf(fileTable[1], "%s", tmp) != EOF)
+            {
+                strcpy(values2[valueCount[1]], tmp);
+                valueCount[1]++;
+            }
+
+            for (i = 0; i < valueCount[0]/fieldCount[0]; ++i)
+            {
+                for (k = 0; k < valueCount[1]/fieldCount[1]; ++k)
+                {
+                    for (j = 0; j < fieldCount[0]; ++j)
+                    {
+                        fprintf(fileTmp, "%s\n", values1[i*fieldCount[0]+j]);
+                    }
+                    for (j = 0; j < fieldCount[1]; ++j)
+                    {
+                        fprintf(fileTmp, "%s\n", values2[k*fieldCount[1]+j]);
+                    }
+                }
+            }
+            fclose(fileTmp);
+            fclose(fileTable[0]);
+            fclose(fileTable[1]);
+            fileTmp = fopen(".tmp", "r");
+
+            fscanf(fileTmp, "%d", &tot);
+            while(fieldTmp != NULL)
+            {
+                strcpy(fieldName[totField], fieldTmp->field);
+                fieldTmp = fieldTmp->next_sf;
+                totField ++;
+            }
+
+            if (fieldRoot != NULL)
+            {
+                for (i = 0; i < tot; ++i)
+                {
+                    fscanf(fileTmp, "%s", allField[i]);
+                    for (j = 0; j < totField; ++j)
+                    {
+                        if (strcmp(allField[i], fieldName[j]) == 0)
+                        {
+                            isField[i] = 1;
+                            break;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                for (i = 0; i < tot; ++i)
+                {
+                    fscanf(fileTmp, "%s", allField[i]);
+                    isField[i] = 1;
+                }
+            }
+            for (i = 0; i < tot; ++i)
+            {
+                if (isField[i])
+                    printf("%*s", 16, allField[i]);
+            }
+            printf("\n");
+
+            int end = 1;
+            for (i = 0; ; ++i)
+            {
+                int conditionFlag = 0;
+                end = 1;
+
+                for (j = 0; j < tot; ++j)
+                {
+                    if(fscanf(fileTmp, "%s", values[j]) == EOF)
+                    {
+                        end = 0;
+                        break;
+                    }
+                }
+                if (end == 0)
+                {
+                    break;
+                }
+
+                conditionFlag = whereSearch(conditionRoot, tot, allField, values);
+                if (conditionFlag)
+                {
+                    for (j = 0; j < tot; ++j)
+                    {
+                        if (isField[j])
+                            printf("%*s", 16, values[j]);
+                    }
+                    printf("\n");
+                }
+            }
+
+            fclose(fileTmp);
+            system("rm -rf .tmp");
+            printf("Select succeed.\n");
         }
     }
 
