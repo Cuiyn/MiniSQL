@@ -48,6 +48,12 @@ struct Selectstruct{ /*select语法树的根节点*/
     struct Selectedtables *st; //所选基本表
     struct Conditions *cons; //条件
 };
+struct Setstruct
+{
+    struct Setstruct *next_s;
+    char *field;
+    char *value;
+};
 
 
 void getDB()
@@ -931,6 +937,130 @@ void deleteWhere(char *tableName, struct Conditions *conditionRoot)
     chdir(rootDir);
 }
 
+void updateWhere(char *tableName, struct Setstruct *setRoot, struct Conditions *conditionRoot)
+{
+    int i = 0, j = 0, totField = 0, totSet = 0, changeFlag = 0;
+    char allField[64][64] = {0};
+    char field[64][64] = {0};
+    char allSet[64][64] = {0};
+    char setValue[64][64] = {0};
+    struct Setstruct * setTmp = setRoot;
+    struct Conditions *conditionTmp = conditionRoot;
+
+    chdir(rootDir);
+
+    if(strlen(database) == 0)
+        printf("\nNo database, error!\n");
+    else if(chdir(database) == -1)
+        printf("\nError!\n");
+    else
+    {
+        if(access(tableName, F_OK) == -1)
+        {
+            printf("Table %s doesn't exist!\n", tableName);
+        }
+        else
+        {
+            FILE* filein;
+            FILE* fileout;
+            int end = 1;
+            char cp[64] = "cp ";
+            char rm[64] = "rm -rf ";
+            char tableTmp[64] = {0};
+            strcpy(tableTmp, tableName);
+            strcat(tableTmp, ".tmp");
+            strcat(cp, tableName);
+            strcat(cp, " ");
+            strcat(cp, tableTmp);
+            strcat(rm, tableTmp);
+
+            totSet = 0;
+            while(setTmp != NULL)
+            {
+                strcpy(allSet[totSet], setTmp->field);
+                strcpy(setValue[totSet], setTmp->value);
+                totSet++;
+                setTmp = setTmp->next_s;
+            }
+
+            system(cp);
+
+            filein = fopen(tableTmp, "r");
+            fileout = fopen(tableName, "w");
+
+            fscanf(filein, "%d", &totField);
+            fprintf(fileout, "%d\n", totField);
+            for (int i = 0; i < totField; ++i)
+            {
+                fscanf(filein, "%s", allField[i]);
+                fprintf(fileout, "%s\n", allField[i]);
+            }
+
+            for (i = 0; ; ++i)
+            {
+                int conditionFlag = 0;
+                end = 1;
+
+                for (j = 0; j < totField; ++j)
+                {
+                    if(fscanf(filein, "%s", field[j]) == EOF)
+                    {
+                        end = 0;
+                        break;
+                    }
+                }
+                if (end == 0)
+                {
+                    break;
+                }
+
+                conditionFlag = whereSearch(conditionRoot, totField, allField, field);
+                if (!conditionFlag)
+                {
+                    for (j = 0; j < totField; ++j)
+                    {
+                        fprintf(fileout, "%s\n", field[j]);
+                    }
+                }
+                else
+                {
+                    for (j = 0; j < totField; ++j)
+                    {
+                        changeFlag = 0;
+                        for (int k = 0; k < totSet; ++k)
+                        {
+                            if (strcmp(allSet[k], allField[j]) == 0)
+                            {
+                                fprintf(fileout, "%s\n", setValue[k]);
+                                changeFlag = 1;
+                                break;
+                            }
+                        }
+                        if (!changeFlag)
+                        {
+                            fprintf(fileout, "%s\n", field[j]);
+                        }
+                    }
+                }
+            }
+            fclose(fileout);
+            fclose(filein);
+            system(rm);
+            printf("Update succeed.\n");
+        }
+    }
+    free(tableName);
+    setTmp = setRoot;
+    while(setRoot != NULL)
+    {
+        setTmp = setRoot;
+        setRoot = setRoot->next_s;
+        free(setTmp);
+    }
+    printf("MiniSQL>");
+    chdir(rootDir);
+}
+
 
 void yyerror(const char *str){
     fprintf(stderr,"error:%s\n",str);
@@ -964,6 +1094,7 @@ main()
     struct Selectedtables *st_var; //所选表格
     struct Conditions *cons_var; //条件语句
     struct Selectstruct *ss_var; //整个select语句
+    struct Setstruct *s_var; //Update set
 }
 
 %token CREATE SHOW DATABASE DATABASES TABLE TABLES INSERT SELECT UPDATE DELETE DROP EXIT NUMBER CHAR INT ID AND OR FROM WHERE VALUES INTO SET QUOTE USE
@@ -975,6 +1106,7 @@ main()
 %type <st_var>  tables
 %type <cons_var>  condition  conditions comp_left comp_right
 %type <ss_var>  selectsql
+%type <s_var> set sets
 %left OR
 %left AND
 
@@ -1228,15 +1360,38 @@ deletesql: DELETE FROM table ';'
             {
                 deleteWhere($3, $5);
             }
-            equal: '='
 
-updatesql: UPDATE table SET sets WHERE field equal value ';'
+updatesql: UPDATE table SET sets WHERE conditions ';'
             {
-            //TODO
-                printf("Update todo...\n");
+                updateWhere($2, $4, $6);
             }
-            sets: set | sets ',' set
-            set: field equal value
+            sets: set
+                  {
+                      $$ = $1;
+                  }
+                  | sets ',' set
+                  {
+                      $$ = (struct Setstruct *)malloc(sizeof(struct Setstruct));
+                      $$->next_s = $1;
+                      $$->field = $3->field;
+                      $$->value = $3->value;
+                      free($3);
+                  }
+            set: ID '=' NUMBER
+                 {
+                     $$ = (struct Setstruct *)malloc(sizeof(struct Setstruct));
+                     $$->field = $1;
+                     $$->value = $3;
+                     $$->next_s = NULL;
+                 }
+                 |
+                 ID '=' QUOTE ID QUOTE
+                 {
+                     $$ = (struct Setstruct *)malloc(sizeof(struct Setstruct));
+                     $$->field = $1;
+                     $$->value = $4;
+                     $$->next_s = NULL;
+                 }
 
 dropsql: DROP TABLE ID ';'
         {
