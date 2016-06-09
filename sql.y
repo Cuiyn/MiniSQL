@@ -632,6 +632,16 @@ void selectNoWhere(struct Selectedfields *fieldRoot, struct Selectedtables *tabl
     printf("MiniSQL>");
 }
 
+void freeWhere(struct Conditions *conditionRoot)
+{
+    if (conditionRoot->left != NULL)
+        freeWhere(conditionRoot->left);
+    else if (conditionRoot->right != NULL)
+        freeWhere(conditionRoot->right);
+    else
+        free(conditionRoot);
+}
+
 int whereSearch(struct Conditions *conditionRoot, int totField, char allField[][64], char value[][64])
 {
     char comp_op = *(conditionRoot->comp_op);
@@ -842,12 +852,7 @@ void selectWhere(struct Selectedfields *fieldRoot, struct Selectedtables *tableR
         tableRoot = tableRoot->next_st;
         free(tableTmp);
     }
-    /*
-    while(conditionRoot != NULL)
-    {
-        //TODO: Memory leak
-    }
-    */
+    freeWhere(conditionRoot);
     chdir(rootDir);
     printf("MiniSQL>");
 }
@@ -933,6 +938,7 @@ void deleteWhere(char *tableName, struct Conditions *conditionRoot)
         }
     }
     free(tableName);
+    freeWhere(conditionRoot);
     printf("MiniSQL>");
     chdir(rootDir);
 }
@@ -1050,6 +1056,7 @@ void updateWhere(char *tableName, struct Setstruct *setRoot, struct Conditions *
         }
     }
     free(tableName);
+    freeWhere(conditionRoot);
     setTmp = setRoot;
     while(setRoot != NULL)
     {
