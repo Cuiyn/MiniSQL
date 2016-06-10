@@ -1568,6 +1568,8 @@ selectsql:  SELECT fields_star FROM tables ';'
                             $$->type = 0;
                             $$->value = $1->field;
                             $$->table = $1->table;
+                            $$->left = NULL;
+                            $$->right = NULL;
                        }
             comp_right: QUOTE table_field QUOTE
                         {
@@ -1575,6 +1577,8 @@ selectsql:  SELECT fields_star FROM tables ';'
                             $$->type = 1;
                             $$->value = $2->field;
                             $$->table = $2->table;
+                            $$->left = NULL;
+                            $$->right = NULL;
                         }
                         | NUMBER
                         {
@@ -1582,6 +1586,8 @@ selectsql:  SELECT fields_star FROM tables ';'
                             $$->type = 2;
                             $$->value = $1;
                             $$->table = NULL;
+                            $$->left = NULL;
+                            $$->right = NULL;
                         }
             comp_op: '<'
                      {
