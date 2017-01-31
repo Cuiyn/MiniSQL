@@ -36,3 +36,4 @@
 minisql
 lex.yy.c
 y.tab.*
+.DS_Store
